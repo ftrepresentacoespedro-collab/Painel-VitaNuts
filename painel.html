@@ -155,13 +155,16 @@ function valorPedidoCarteira(p){
   return 0;
 }
 
-// Classifica a nota como "Consumidor Final" ou "Revenda". Tenta primeiro o
-// campo oficial da NFe (indFinal: 1 = consumidor final, 0 = revenda). Se
-// esse campo não vier nos dados, cai pra um palpite a partir do texto que
-// o Bling já escreve nos itens ("Venda normal para consumidor final...").
-function classificarNota(n){
-  if(n.indFinal === 1 || n.indFinal === '1') return 'Consumidor Final';
-  if(n.indFinal === 0 || n.indFinal === '0') return 'Revenda';
+// Classifica a nota como "Consumidor Final" ou "Revenda", usando o nome
+// real da "natureza da operação" que vem do Bling (dados.naturezas_operacao,
+// um mapa id -> nome). Se por algum motivo não achar, cai pro texto dos
+// itens como último recurso.
+function classificarNota(n, naturezasOperacao){
+  const idNatureza = n.naturezaOperacao && n.naturezaOperacao.id;
+  const nomeNatureza = (naturezasOperacao && idNatureza && naturezasOperacao[idNatureza] || '').toLowerCase();
+  if(nomeNatureza.includes('revenda')) return 'Revenda';
+  if(nomeNatureza.includes('consumidor final')) return 'Consumidor Final';
+
   const texto = (n.itens || []).map(i => i.informacoesAdicionais || '').join(' ').toLowerCase();
   if(texto.includes('consumidor final')) return 'Consumidor Final';
   if(texto.includes('revenda')) return 'Revenda';
@@ -247,7 +250,7 @@ function render(){
   // ---- Faturado: Consumidor Final x Revenda ----
   const grupoFaturado = { 'Consumidor Final': { valor:0, clientes:new Set() }, 'Revenda': { valor:0, clientes:new Set() }, 'Não classificado': { valor:0, clientes:new Set() } };
   notasMes.forEach(n => {
-    const grupo = classificarNota(n);
+    const grupo = classificarNota(n, dados.naturezas_operacao);
     grupoFaturado[grupo].valor += valorNota(n);
     grupoFaturado[grupo].clientes.add((n.contato && n.contato.id) || nomeCliente(n));
   });
