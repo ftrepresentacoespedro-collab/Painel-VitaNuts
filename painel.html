@@ -114,8 +114,7 @@ async function tentarLogin(){
 
 async function carregarDados(senha, veioDoLogin){
   try {
-    const resp = await fetch(API_URL + '?senha=' + encodeURIComponent(senha) + '&_=' + Date.now());
-    const json = await resp.json();
+    const json = await buscarViaJsonp(API_URL, senha);
     if(json.erro === 'senha_incorreta'){
       renderLogin(true);
       return;
@@ -129,6 +128,41 @@ async function carregarDados(senha, veioDoLogin){
   } catch(err){
     document.getElementById('app').innerHTML = `<div class="empty"><p>Erro ao buscar dados: ${err.message}</p></div>`;
   }
+}
+
+// Busca os dados via JSONP (uma tag <script> dinâmica) em vez de fetch(),
+// porque o navegador bloqueia fetch() entre domínios diferentes (CORS) —
+// GitHub Pages e Google Apps Script são domínios diferentes. Tags
+// <script> não têm essa restrição.
+function buscarViaJsonp(url, senha){
+  return new Promise((resolve, reject) => {
+    const nomeCallback = 'jsonp_cb_' + Date.now() + '_' + Math.floor(Math.random()*100000);
+    const script = document.createElement('script');
+    let terminou = false;
+
+    window[nomeCallback] = function(dados){
+      terminou = true;
+      resolve(dados);
+      delete window[nomeCallback];
+      script.remove();
+    };
+
+    script.src = url + '?senha=' + encodeURIComponent(senha) + '&callback=' + nomeCallback + '&_=' + Date.now();
+    script.onerror = () => {
+      if(!terminou) reject(new Error('Falha ao carregar dados (verifique a URL da API)'));
+      delete window[nomeCallback];
+      script.remove();
+    };
+    document.body.appendChild(script);
+
+    setTimeout(() => {
+      if(!terminou){
+        reject(new Error('Tempo esgotado buscando dados'));
+        delete window[nomeCallback];
+        script.remove();
+      }
+    }, 20000);
+  });
 }
 
 function formatarDataHora(iso){
