@@ -64,6 +64,14 @@
   .bar-fill{height:100%;background:var(--green);border-radius:3px;}
   .empty{text-align:center;padding:60px 20px;color:var(--muted);}
 
+  .mini-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;}
+  .mini-card{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:14px 16px;}
+  .mini-card .mc-label{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+  .mini-card .mc-value{font-size:19px;font-weight:800;color:var(--ink);letter-spacing:-.01em;}
+  .mini-card .mc-sub{font-size:11.5px;color:var(--muted);margin-top:4px;}
+  .mini-card .mc-bar{height:4px;background:var(--line);border-radius:3px;margin-top:9px;overflow:hidden;}
+  .mini-card .mc-bar-fill{height:100%;border-radius:3px;}
+
   .login-wrap{display:flex;align-items:center;justify-content:center;min-height:80vh;}
   .login-card{background:var(--card);padding:32px;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,0.1);text-align:center;max-width:360px;width:100%;}
   .login-card h2{margin-top:0;}
@@ -189,19 +197,20 @@ function valorPedidoCarteira(p){
   return 0;
 }
 
-// Classifica a nota como "Consumidor Final" ou "Revenda", usando o nome
-// real da "natureza da operação" que vem do Bling (dados.naturezas_operacao,
-// um mapa id -> nome). Se por algum motivo não achar, cai pro texto dos
-// itens como último recurso.
+// Classifica a nota como "B2C" ou "B2B", usando o nome real da "natureza
+// da operação" que vem do Bling (dados.naturezas_operacao, um mapa
+// id -> nome). A detecção continua olhando pelos termos originais do Bling
+// ("consumidor final" / "revenda") — só o rótulo exibido virou B2C/B2B.
+// Se por algum motivo não achar, cai pro texto dos itens como último recurso.
 function classificarNota(n, naturezasOperacao){
   const idNatureza = n.naturezaOperacao && n.naturezaOperacao.id;
   const nomeNatureza = (naturezasOperacao && idNatureza && naturezasOperacao[idNatureza] || '').toLowerCase();
-  if(nomeNatureza.includes('revenda')) return 'Revenda';
-  if(nomeNatureza.includes('consumidor final')) return 'Consumidor Final';
+  if(nomeNatureza.includes('revenda')) return 'B2B';
+  if(nomeNatureza.includes('consumidor final')) return 'B2C';
 
   const texto = (n.itens || []).map(i => i.informacoesAdicionais || '').join(' ').toLowerCase();
-  if(texto.includes('consumidor final')) return 'Consumidor Final';
-  if(texto.includes('revenda')) return 'Revenda';
+  if(texto.includes('consumidor final')) return 'B2C';
+  if(texto.includes('revenda')) return 'B2B';
   return 'Não classificado';
 }
 function notasDoMesAtual(notas){
@@ -231,6 +240,31 @@ function svgBarrinha(pctRealizado, pctComCarteira){
     </g>
   </svg>`;
 }
+const CORES_GRUPO = {
+  'B2C': 'var(--gold)',
+  'B2B': 'var(--navy)',
+  'Pessoa Física': 'var(--green)',
+  'Pessoa Jurídica': 'var(--gold)',
+  'Não classificado': 'var(--muted)',
+  'Não identificado': 'var(--muted)'
+};
+
+function miniCardsGrupo(entradas, total){
+  if(entradas.length === 0) return '<p style="font-size:12.5px;color:var(--muted);">Sem dados neste período ainda.</p>';
+  const cards = entradas.map(([nome, valor, extra]) => {
+    const cor = CORES_GRUPO[nome] || 'var(--muted)';
+    const pct = total > 0 ? (valor/total*100) : 0;
+    return `
+    <div class="mini-card">
+      <div class="mc-label"><span class="dot" style="background:${cor}"></span>${escapeHtml(nome)}</div>
+      <div class="mc-value">${brl(valor)}</div>
+      <div class="mc-sub">${extra ? extra + ' · ' : ''}${pct.toFixed(1)}% do total</div>
+      <div class="mc-bar"><div class="mc-bar-fill" style="width:${pct.toFixed(0)}%;background:${cor}"></div></div>
+    </div>`;
+  }).join('');
+  return `<div class="mini-cards">${cards}</div>`;
+}
+
 function rankingTable(lista, total, maior){
   if(lista.length === 0) return '<p style="font-size:12.5px;color:var(--muted);">Sem vendas de produto registradas neste mês ainda.</p>';
   const linhas = lista.map(p => `
@@ -281,8 +315,8 @@ function render(){
   const totalTop10 = rankingProdutos.reduce((s,p)=>s+p.valor,0);
   const maiorValor = rankingProdutos.length ? rankingProdutos[0].valor : 1;
 
-  // ---- Faturado: Consumidor Final x Revenda ----
-  const grupoFaturado = { 'Consumidor Final': { valor:0, clientes:new Set() }, 'Revenda': { valor:0, clientes:new Set() }, 'Não classificado': { valor:0, clientes:new Set() } };
+  // ---- Faturado: B2C x B2B ----
+  const grupoFaturado = { 'B2C': { valor:0, clientes:new Set() }, 'B2B': { valor:0, clientes:new Set() }, 'Não classificado': { valor:0, clientes:new Set() } };
   notasMes.forEach(n => {
     const grupo = classificarNota(n, dados.naturezas_operacao);
     grupoFaturado[grupo].valor += valorNota(n);
@@ -343,36 +377,23 @@ function render(){
 
     <div class="panels">
       <div class="panel">
-        <h3>Faturado — Consumidor Final × Revenda</h3>
+        <h3>Faturado — B2C × B2B</h3>
         <div class="sub">Divisão do faturamento real do mês por classificação da nota</div>
-        <table>
-          <thead><tr><th>Classificação</th><th class="num">Faturamento</th><th class="num">Clientes</th></tr></thead>
-          <tbody>
-            ${Object.entries(grupoFaturado).filter(([,v]) => v.valor > 0 || v.clientes.size > 0).map(([nome, v]) => `
-              <tr>
-                <td class="prod-name">${escapeHtml(nome)}</td>
-                <td class="num">${brl(v.valor)}</td>
-                <td class="num">${v.clientes.size}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+        ${miniCardsGrupo(
+          Object.entries(grupoFaturado)
+            .filter(([,v]) => v.valor > 0 || v.clientes.size > 0)
+            .map(([nome, v]) => [nome, v.valor, v.clientes.size + ' clientes']),
+          Object.values(grupoFaturado).reduce((s,v)=>s+v.valor,0)
+        )}
       </div>
 
       <div class="panel">
         <h3>Carteira em aberto — Pessoa Física × Pessoa Jurídica</h3>
         <div class="sub">Divisão dos pedidos ainda não faturados por tipo de cliente</div>
-        <table>
-          <thead><tr><th>Tipo</th><th class="num">Valor em carteira</th></tr></thead>
-          <tbody>
-            ${Object.entries(grupoCarteira).filter(([,v]) => v > 0).map(([nome, v]) => `
-              <tr>
-                <td class="prod-name">${escapeHtml(nome)}</td>
-                <td class="num">${brl(v)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+        ${miniCardsGrupo(
+          Object.entries(grupoCarteira).filter(([,v]) => v > 0),
+          Object.values(grupoCarteira).reduce((s,v)=>s+v,0)
+        )}
       </div>
 
       <div class="panel">
