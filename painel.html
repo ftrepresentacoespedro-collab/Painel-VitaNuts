@@ -147,6 +147,26 @@ function valorNota(n){
   return (n.itens || []).reduce((s, it) => s + valorItem(it), 0);
 }
 function nomeCliente(n){ return (n.contato && n.contato.nome) ? n.contato.nome : 'Cliente não identificado'; }
+function valorPedidoCarteira(p){
+  const campos = ['total', 'totalProdutos', 'valorTotal'];
+  for(const c of campos){
+    if(p[c] !== undefined && p[c] !== null) return Number(p[c]);
+  }
+  return 0;
+}
+
+// Classifica a nota como "Consumidor Final" ou "Revenda". Tenta primeiro o
+// campo oficial da NFe (indFinal: 1 = consumidor final, 0 = revenda). Se
+// esse campo não vier nos dados, cai pra um palpite a partir do texto que
+// o Bling já escreve nos itens ("Venda normal para consumidor final...").
+function classificarNota(n){
+  if(n.indFinal === 1 || n.indFinal === '1') return 'Consumidor Final';
+  if(n.indFinal === 0 || n.indFinal === '0') return 'Revenda';
+  const texto = (n.itens || []).map(i => i.informacoesAdicionais || '').join(' ').toLowerCase();
+  if(texto.includes('consumidor final')) return 'Consumidor Final';
+  if(texto.includes('revenda')) return 'Revenda';
+  return 'Não classificado';
+}
 function notasDoMesAtual(notas){
   const hoje = new Date();
   const mes = hoje.getMonth();
@@ -224,6 +244,25 @@ function render(){
   const totalTop10 = rankingProdutos.reduce((s,p)=>s+p.valor,0);
   const maiorValor = rankingProdutos.length ? rankingProdutos[0].valor : 1;
 
+  // ---- Faturado: Consumidor Final x Revenda ----
+  const grupoFaturado = { 'Consumidor Final': { valor:0, clientes:new Set() }, 'Revenda': { valor:0, clientes:new Set() }, 'Não classificado': { valor:0, clientes:new Set() } };
+  notasMes.forEach(n => {
+    const grupo = classificarNota(n);
+    grupoFaturado[grupo].valor += valorNota(n);
+    grupoFaturado[grupo].clientes.add((n.contato && n.contato.id) || nomeCliente(n));
+  });
+
+  // ---- Carteira: Pessoa Física x Pessoa Jurídica ----
+  const pedidosCarteira = (dados.carteira_aberto && dados.carteira_aberto.pedidos) || [];
+  const grupoCarteira = { 'Pessoa Física': 0, 'Pessoa Jurídica': 0, 'Não identificado': 0 };
+  pedidosCarteira.forEach(p => {
+    const tipo = p.contato && p.contato.tipoPessoa;
+    const valor = valorPedidoCarteira(p);
+    if(tipo === 'F') grupoCarteira['Pessoa Física'] += valor;
+    else if(tipo === 'J') grupoCarteira['Pessoa Jurídica'] += valor;
+    else grupoCarteira['Não identificado'] += valor;
+  });
+
   const avisoSync = dados.sincronizacao_completa === false
     ? `<div class="badge warn" style="margin-bottom:12px;display:inline-block;">Sincronizando histórico do mês: ${dados.notas_com_itens_processados}/${dados.total_notas} notas processadas</div><br>`
     : '';
@@ -266,6 +305,39 @@ function render(){
     </div>
 
     <div class="panels">
+      <div class="panel">
+        <h3>Faturado — Consumidor Final × Revenda</h3>
+        <div class="sub">Divisão do faturamento real do mês por classificação da nota</div>
+        <table>
+          <thead><tr><th>Classificação</th><th class="num">Faturamento</th><th class="num">Clientes</th></tr></thead>
+          <tbody>
+            ${Object.entries(grupoFaturado).filter(([,v]) => v.valor > 0 || v.clientes.size > 0).map(([nome, v]) => `
+              <tr>
+                <td class="prod-name">${escapeHtml(nome)}</td>
+                <td class="num">${brl(v.valor)}</td>
+                <td class="num">${v.clientes.size}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h3>Carteira em aberto — Pessoa Física × Pessoa Jurídica</h3>
+        <div class="sub">Divisão dos pedidos ainda não faturados por tipo de cliente</div>
+        <table>
+          <thead><tr><th>Tipo</th><th class="num">Valor em carteira</th></tr></thead>
+          <tbody>
+            ${Object.entries(grupoCarteira).filter(([,v]) => v > 0).map(([nome, v]) => `
+              <tr>
+                <td class="prod-name">${escapeHtml(nome)}</td>
+                <td class="num">${brl(v)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+
       <div class="panel">
         <h3>Ranking de produtos por faturamento real</h3>
         <div class="sub">Quem está puxando o resultado do mês — top 10 por faturamento real</div>
