@@ -197,22 +197,51 @@ function valorPedidoCarteira(p){
   return 0;
 }
 
-// Classifica a nota como "B2C" ou "B2B", usando o nome real da "natureza
-// da operação" que vem do Bling (dados.naturezas_operacao, um mapa
-// id -> nome). A detecção continua olhando pelos termos originais do Bling
-// ("consumidor final" / "revenda") — só o rótulo exibido virou B2C/B2B.
-// Se por algum motivo não achar, cai pro texto dos itens como último recurso.
+// Classifica a nota como "B2C" ou "B2B". Ordem de prioridade:
+// 1) natureza da operação real do Bling (dados.naturezas_operacao) — mais
+//    confiável, mas só funciona quando esse mapa vem populado.
+// 2) CNPJ (14 dígitos) + Inscrição Estadual preenchida no cliente — sinal
+//    estrutural de empresa/revenda, não depende de ninguém ter digitado
+//    texto certo em campo nenhum.
+// 3) texto livre de informacoesAdicionais, como último recurso — mas
+//    ignorando "revenda" quando vem negada (ex: "Proibida revenda", que
+//    aparece em notas de amostra/divulgação e não é venda B2B nenhuma).
 function classificarNota(n, naturezasOperacao){
   const idNatureza = n.naturezaOperacao && n.naturezaOperacao.id;
   const nomeNatureza = (naturezasOperacao && idNatureza && naturezasOperacao[idNatureza] || '').toLowerCase();
   if(nomeNatureza.includes('revenda')) return 'B2B';
   if(nomeNatureza.includes('consumidor final')) return 'B2C';
 
+  const doc = ((n.contato && n.contato.numeroDocumento) || '').replace(/\D/g, '');
+  const temIE = !!(n.contato && n.contato.ie && n.contato.ie.trim());
+  if(doc.length === 14 && temIE) return 'B2B';
+
   const texto = (n.itens || []).map(i => i.informacoesAdicionais || '').join(' ').toLowerCase();
   if(texto.includes('consumidor final')) return 'B2C';
-  if(texto.includes('revenda')) return 'B2B';
+
+  const negacoes = ['proibida revenda', 'proibido revenda', 'sem revenda', 'não revenda', 'nao revenda'];
+  const temRevendaNegada = negacoes.some(neg => texto.includes(neg));
+  if(texto.includes('revenda') && !temRevendaNegada) return 'B2B';
+
   return 'Não classificado';
 }
+
+// Classifica pedido em aberto (carteira) como B2C/B2B usando o mesmo
+// critério estrutural: tipoPessoa vindo do Bling é o sinal mais confiável
+// que existe (F = pessoa física, J = pessoa jurídica), então tem
+// prioridade; CNPJ+IE funciona como reforço/fallback se tipoPessoa vier
+// vazio por algum motivo.
+function classificarPedidoCarteira(p){
+  const tipo = p.contato && p.contato.tipoPessoa;
+  if(tipo === 'F') return 'B2C';
+  if(tipo === 'J') return 'B2B';
+  const doc = ((p.contato && p.contato.numeroDocumento) || '').replace(/\D/g, '');
+  const temIE = !!(p.contato && p.contato.ie && p.contato.ie.trim());
+  if(doc.length === 14 && temIE) return 'B2B';
+  if(doc.length === 11) return 'B2C';
+  return 'Não identificado';
+}
+
 function notasDoMesAtual(notas){
   const hoje = new Date();
   const mes = hoje.getMonth();
@@ -243,8 +272,6 @@ function svgBarrinha(pctRealizado, pctComCarteira){
 const CORES_GRUPO = {
   'B2C': 'var(--gold)',
   'B2B': 'var(--navy)',
-  'Pessoa Física': 'var(--green)',
-  'Pessoa Jurídica': 'var(--gold)',
   'Não classificado': 'var(--muted)',
   'Não identificado': 'var(--muted)'
 };
@@ -323,19 +350,24 @@ function render(){
     grupoFaturado[grupo].clientes.add((n.contato && n.contato.id) || nomeCliente(n));
   });
 
-  // ---- Carteira: Pessoa Física x Pessoa Jurídica ----
+  // ---- Carteira: B2C x B2B (mesmo esquema visual/rótulo do Faturado) ----
   const pedidosCarteira = (dados.carteira_aberto && dados.carteira_aberto.pedidos) || [];
-  const grupoCarteira = { 'Pessoa Física': 0, 'Pessoa Jurídica': 0, 'Não identificado': 0 };
+  const grupoCarteira = { 'B2C': 0, 'B2B': 0, 'Não identificado': 0 };
   pedidosCarteira.forEach(p => {
-    const tipo = p.contato && p.contato.tipoPessoa;
-    const valor = valorPedidoCarteira(p);
-    if(tipo === 'F') grupoCarteira['Pessoa Física'] += valor;
-    else if(tipo === 'J') grupoCarteira['Pessoa Jurídica'] += valor;
-    else grupoCarteira['Não identificado'] += valor;
+    const grupo = classificarPedidoCarteira(p);
+    grupoCarteira[grupo] += valorPedidoCarteira(p);
   });
 
   const avisoSync = dados.sincronizacao_completa === false
     ? `<div class="badge warn" style="margin-bottom:12px;display:inline-block;">Sincronizando histórico do mês: ${dados.notas_com_itens_processados}/${dados.total_notas} notas processadas</div><br>`
+    : '';
+
+  // Aviso de diagnóstico: se a carteira veio zerada E o Apps Script
+  // reportou erro HTTP na chamada de pedidos, mostra isso na tela em vez
+  // de simplesmente aparecer "R$ 0" sem explicação nenhuma.
+  const debugCarteira = dados.carteira_aberto && dados.carteira_aberto.debug;
+  const avisoCarteira = (pedidosCarteira.length === 0 && debugCarteira && debugCarteira.erro_http)
+    ? `<div class="badge off" style="margin-bottom:12px;display:inline-block;">Carteira não carregou: erro ${debugCarteira.erro_http.status} ao buscar pedidos no Bling (ver Registros de execução no Apps Script)</div><br>`
     : '';
 
   document.getElementById('app').innerHTML = `
@@ -348,6 +380,7 @@ function render(){
     </div>
 
     ${avisoSync}
+    ${avisoCarteira}
     <div class="meta-card">
       <div class="barrinha">
         ${svgBarrinha(pctRealizado, pctRealCarteira)}
@@ -388,7 +421,7 @@ function render(){
       </div>
 
       <div class="panel">
-        <h3>Carteira em aberto — Pessoa Física × Pessoa Jurídica</h3>
+        <h3>Carteira em aberto — B2C × B2B</h3>
         <div class="sub">Divisão dos pedidos ainda não faturados por tipo de cliente</div>
         ${miniCardsGrupo(
           Object.entries(grupoCarteira).filter(([,v]) => v > 0),
