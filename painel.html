@@ -242,6 +242,17 @@ function classificarPedidoCarteira(p){
   return 'Não identificado';
 }
 
+// Identifica notas de amostra/divulgação (influencer, MKT, brindes) —
+// têm "Sem valor comercial" no texto dos itens. Essas notas continuam
+// aparecendo classificadas normalmente no painel de B2C x B2B (pra ficar
+// visível onde caíram), mas não devem contar como faturamento real nem
+// entrar no cálculo da meta, tendência, clientes positivados ou ranking
+// de produtos — não são vendas de verdade.
+function ehNotaAmostra(n){
+  const texto = (n.itens || []).map(i => i.informacoesAdicionais || '').join(' ').toLowerCase();
+  return texto.includes('sem valor comercial');
+}
+
 function notasDoMesAtual(notas){
   const hoje = new Date();
   const mes = hoje.getMonth();
@@ -314,12 +325,16 @@ function render(){
   }
 
   const notasMes = notasDoMesAtual(dados.notas || []);
-  const faturamentoReal = notasMes.reduce((s,n)=>s+valorNota(n), 0);
+  const notasAmostra = notasMes.filter(ehNotaAmostra);
+  const notasParaMeta = notasMes.filter(n => !ehNotaAmostra(n));
+  const valorAmostras = notasAmostra.reduce((s,n)=>s+valorNota(n), 0);
+
+  const faturamentoReal = notasParaMeta.reduce((s,n)=>s+valorNota(n), 0);
   const hoje = new Date();
   const diaAtual = hoje.getDate();
   const diasNoMes = new Date(hoje.getFullYear(), hoje.getMonth()+1, 0).getDate();
   const tendencia = diaAtual > 0 ? (faturamentoReal / diaAtual) * diasNoMes : 0;
-  const clientesPositivados = new Set(notasMes.map(n => (n.contato && n.contato.id) || nomeCliente(n))).size;
+  const clientesPositivados = new Set(notasParaMeta.map(n => (n.contato && n.contato.id) || nomeCliente(n))).size;
 
   const gapMeta = Math.max(metaMes - faturamentoReal, 0);
   const realMaisCarteira = faturamentoReal + (carteiraAberto || 0);
@@ -328,7 +343,7 @@ function render(){
   const pctRealCarteira = metaMes > 0 ? Math.min(realMaisCarteira / metaMes, 1) : 0;
 
   const produtos = {};
-  notasMes.forEach(n => {
+  notasParaMeta.forEach(n => {
     (n.itens || []).forEach(item => {
       const sku = item.codigo || item.produto?.codigo || '—';
       const nome = item.descricao || item.produto?.descricao || 'Produto sem nome';
@@ -411,7 +426,7 @@ function render(){
     <div class="panels">
       <div class="panel">
         <h3>Faturado — B2C × B2B</h3>
-        <div class="sub">Divisão do faturamento real do mês por classificação da nota</div>
+        <div class="sub">Divisão do faturamento real do mês por classificação da nota${valorAmostras > 0 ? ` — não inclui ${brl(valorAmostras)} em ${notasAmostra.length} nota(s) de amostra/divulgação (sem valor comercial, não contam pra meta)` : ''}</div>
         ${miniCardsGrupo(
           Object.entries(grupoFaturado)
             .filter(([,v]) => v.valor > 0 || v.clientes.size > 0)
