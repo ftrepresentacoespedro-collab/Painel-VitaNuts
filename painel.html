@@ -5,85 +5,148 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Painel de Vendas — Vitanuts</title>
 <style>
-  :root{
-    --bg:#F7F0E1;
-    --navy:#16233F;
-    --navy-2:#1D2E52;
-    --green:#3C7A4D;
-    --gold:#C9A24B;
-    --gold-light:#E4CD8E;
-    --red:#B5453B;
-    --ink:#22201A;
-    --muted:#8A8270;
-    --card:#FFFFFF;
-    --line:#EAE1CC;
-  }
-  *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:var(--ink);padding:28px;}
-  .wrap{max-width:1180px;margin:0 auto;}
-  .toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap;}
-  .toolbar h1{font-size:20px;margin:0;font-weight:700;}
-  .toolbar .sub{color:var(--muted);font-size:13px;margin-top:2px;}
-  .badge{font-size:12px;padding:4px 10px;border-radius:999px;background:#EAF3EC;color:var(--green);font-weight:600;}
-  .badge.warn{background:#FBF1DD;color:#9C7A22;}
-  .badge.off{background:#F5E7E5;color:var(--red);}
-  .meta-card{background:var(--card);border-radius:16px;padding:22px 26px;display:flex;align-items:center;gap:28px;margin-bottom:18px;box-shadow:0 1px 2px rgba(0,0,0,0.04);}
-  .barrinha{flex:0 0 110px;text-align:center;}
-  .barrinha svg{width:96px;height:96px;}
-  .barrinha .pct{font-weight:700;font-size:20px;margin-top:4px;}
-  .meta-text h2{font-size:15px;margin:0 0 6px 0;font-weight:700;}
-  .meta-text p{font-size:12.5px;color:var(--muted);margin:0 0 12px 0;line-height:1.5;max-width:640px;}
-  .legend{display:flex;gap:22px;flex-wrap:wrap;align-items:center;font-size:12.5px;}
-  .legend span{display:inline-flex;align-items:center;gap:6px;font-weight:600;}
-  .dot{width:10px;height:10px;border-radius:3px;display:inline-block;}
-  .dot.green{background:var(--green);}
-  .dot.gold{background:var(--gold-light);border:1px solid var(--gold);}
-  .dot.outline{background:transparent;border:1.5px dashed var(--muted);}
-  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;}
-  .kpi{background:linear-gradient(180deg,var(--navy-2),var(--navy));border-radius:14px;padding:16px 18px;color:#fff;}
-  .kpi .label{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#9FB0CC;font-weight:700;margin-bottom:8px;}
-  .kpi .value{font-size:22px;font-weight:800;letter-spacing:-.01em;}
-  .kpi .delta{font-size:11.5px;margin-top:6px;font-weight:600;}
-  .kpi .delta.good{color:#8FD9A3;}
-  .kpi .delta.bad{color:#F0A69E;}
-  .kpi .delta.neutral{color:#B9C4DA;}
-  .panels{display:grid;grid-template-columns:1fr;gap:16px;}
-  .panel{background:var(--card);border-radius:16px;padding:20px 22px;box-shadow:0 1px 2px rgba(0,0,0,0.04);}
-  .panel h3{font-size:14.5px;margin:0 0 2px 0;font-weight:700;}
-  .panel .sub{font-size:12px;color:var(--muted);margin-bottom:16px;}
-  table{width:100%;border-collapse:collapse;}
-  thead th{text-align:left;font-size:10.5px;letter-spacing:.05em;color:var(--muted);text-transform:uppercase;font-weight:700;padding-bottom:8px;border-bottom:1px solid var(--line);}
-  thead th.num{text-align:right;}
-  tbody td{padding:10px 0;border-bottom:1px solid var(--line);vertical-align:top;}
-  tbody tr:last-child td{border-bottom:none;}
-  .prod-name{font-size:13px;font-weight:600;}
-  .prod-sku{font-size:10.5px;color:var(--muted);margin-top:1px;}
-  .num{text-align:right;font-size:13px;font-weight:700;white-space:nowrap;}
-  .pct{text-align:right;font-size:12px;color:var(--muted);width:60px;}
-  .bar-track{height:5px;background:var(--line);border-radius:3px;margin-top:6px;overflow:hidden;}
-  .bar-fill{height:100%;background:var(--green);border-radius:3px;}
-  .empty{text-align:center;padding:60px 20px;color:var(--muted);}
+/* ===================== Nocturne — design tokens e componentes base ===================== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-  .mini-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;}
-  .mini-card{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:14px 16px;}
-  .mini-card .mc-label{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
-  .mini-card .mc-value{font-size:19px;font-weight:800;color:var(--ink);letter-spacing:-.01em;}
-  .mini-card .mc-sub{font-size:11.5px;color:var(--muted);margin-top:4px;}
-  .mini-card .mc-bar{height:4px;background:var(--line);border-radius:3px;margin-top:9px;overflow:hidden;}
-  .mini-card .mc-bar-fill{height:100%;border-radius:3px;}
+:root {
+  --color-bg: #161826;
+  --color-surface: #232532;
+  --color-text: #e9e9ed;
+  --color-accent: #9184d9;
+  --color-accent-2: #a7a1db;
+  --color-divider: color-mix(in srgb, #e9e9ed 16%, transparent);
 
-  .login-wrap{display:flex;align-items:center;justify-content:center;min-height:80vh;}
-  .login-card{background:var(--card);padding:32px;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,0.1);text-align:center;max-width:360px;width:100%;}
-  .login-card h2{margin-top:0;}
-  .login-card input{width:100%;padding:10px;font-size:16px;border:1px solid var(--line);border-radius:6px;margin-bottom:14px;}
-  .login-card button{width:100%;padding:10px 24px;font-size:15px;background:var(--navy);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;}
-  .login-card .erro{color:var(--red);font-size:13px;margin-bottom:10px;}
+  --color-neutral-100: #f3f5fe;
+  --color-neutral-200: #e4e7f5;
+  --color-neutral-300: #cfd3e5;
+  --color-neutral-400: #b2b6ca;
+  --color-neutral-500: #9397ab;
+  --color-neutral-600: #75798c;
+  --color-neutral-700: #595d6c;
+  --color-neutral-800: #3f424d;
+  --color-neutral-900: #292b31;
 
-  @media (max-width:900px){.kpi-grid{grid-template-columns:repeat(2,1fr);}.meta-card{flex-direction:column;align-items:flex-start;}}
+  --color-accent-100: #f5f4ff;
+  --color-accent-200: #e7e5fe;
+  --color-accent-300: #d2cefd;
+  --color-accent-400: #b5abfc;
+  --color-accent-500: #968ae0;
+  --color-accent-600: #796cbf;
+  --color-accent-700: #5d5294;
+  --color-accent-800: #423a6a;
+  --color-accent-900: #2b2741;
+
+  --color-accent-2-100: #f5f4ff;
+  --color-accent-2-200: #e7e5fe;
+  --color-accent-2-300: #d2cefd;
+  --color-accent-2-400: #b5afe8;
+  --color-accent-2-500: #9690c9;
+  --color-accent-2-600: #7972a9;
+  --color-accent-2-700: #5c5783;
+  --color-accent-2-800: #423e5d;
+  --color-accent-2-900: #2b293a;
+
+  --color-red: #e2685f;
+  --color-red-bg: rgba(226, 104, 95, 0.14);
+  --color-amber: #e0b355;
+  --color-amber-bg: rgba(224, 179, 85, 0.14);
+  --color-green: #6fcf97;
+
+  --font-heading: "Inter", system-ui, sans-serif;
+  --font-heading-weight: 500;
+  --font-body: "Inter", system-ui, sans-serif;
+
+  --space-1: 2.8px;
+  --space-2: 5.6px;
+  --space-3: 8.4px;
+  --space-4: 11.2px;
+  --space-6: 16.8px;
+  --space-8: 22.4px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+
+  --shadow-sm: 0 0 0 1px #3f424d;
+  --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0,0,0,0.55);
+  --shadow-lg: 0 0 0 1px #9397ab, 0 16px 40px rgba(0,0,0,0.65);
+}
+
+* , *::before, *::after { box-sizing: border-box; }
+body { margin: 0; background: var(--color-bg); color: var(--color-text); font-family: var(--font-body); font-size: 15px; line-height: 1.55; font-weight: 400; }
+h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); font-weight: var(--font-heading-weight); line-height: 1.12; letter-spacing: -0.015em; margin: 0 0 var(--space-2); }
+h1 { font-size: 30px; }
+h2 { font-size: 22px; }
+h3 { font-size: 17px; }
+p { margin: 0 0 var(--space-3); }
+.text-muted { color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; text-decoration: none; font-family: var(--font-heading); font-weight: var(--font-heading-weight); font-size: 14px; line-height: 1.2; color: var(--color-text); background: transparent; border: 1px solid transparent; padding: var(--space-2) calc(var(--space-3) * 1.2); border-radius: var(--radius-md); width: 100%; margin-top: var(--space-2); }
+.btn-primary { color: var(--color-accent); border-color: var(--color-accent); }
+.btn-primary:hover { background: color-mix(in srgb, var(--color-accent) 12%, transparent); }
+.btn-primary:active { background: color-mix(in srgb, var(--color-accent) 22%, transparent); }
+
+.field > label { display: block; font-size: 12px; margin-bottom: 5px; color: color-mix(in srgb, var(--color-text) 70%, transparent); }
+.input { width: 100%; min-height: 36px; padding: 6px 10px; font: inherit; font-size: 14px; color: var(--color-text); caret-color: var(--color-accent); background: var(--color-surface); border: 1px solid var(--color-divider); border-radius: var(--radius-md); }
+.input:hover { border-color: color-mix(in srgb, var(--color-text) 45%, transparent); }
+.input:focus-visible { border-color: var(--color-accent); outline-offset: 0; }
+
+.card { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4); border-radius: var(--radius-md); background: var(--color-surface); }
+.card-kicker { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-accent); }
+.card-meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: color-mix(in srgb, var(--color-text) 50%, transparent); }
+.elev-sm { box-shadow: var(--shadow-sm); }
+.elev-md { box-shadow: var(--shadow-md); }
+
+.tag { display: inline-flex; align-items: center; font-size: 11px; letter-spacing: 0.02em; padding: 3px 10px; border-radius: calc(var(--radius-md) * 0.75); }
+.tag-accent { background: var(--color-accent-800); color: var(--color-accent-100); }
+.tag-accent-2 { background: var(--color-accent-2-800); color: var(--color-accent-2-100); }
+.tag-neutral { background: var(--color-neutral-800); color: var(--color-neutral-100); }
+.tag-outline { border: 1px solid var(--color-accent); color: var(--color-accent); }
+.tag-red { background: var(--color-red-bg); color: var(--color-red); }
+.tag-amber { background: var(--color-amber-bg); color: var(--color-amber); }
+
+.nav { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-6); flex-wrap: wrap; }
+.nav-brand { font-family: var(--font-heading); font-weight: var(--font-heading-weight); font-size: 18px; margin-right: auto; }
+
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th { text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in srgb, var(--color-text) 60%, transparent); padding: var(--space-2); }
+.table th.num { text-align: right; }
+.table td { padding: var(--space-2); vertical-align: top; }
+.table tbody tr { background: linear-gradient(to right, transparent, color-mix(in srgb, var(--color-text) 8%, transparent) 24px, color-mix(in srgb, var(--color-text) 8%, transparent) calc(100% - 24px), transparent) no-repeat bottom / 100% 1px; }
+.table tbody tr:hover { background: linear-gradient(color-mix(in srgb, var(--color-text) 4%, transparent), color-mix(in srgb, var(--color-text) 4%, transparent)) no-repeat 0 0 / 100% 100%, linear-gradient(to right, transparent, color-mix(in srgb, var(--color-text) 8%, transparent) 24px, color-mix(in srgb, var(--color-text) 8%, transparent) calc(100% - 24px), transparent) no-repeat bottom / 100% 1px; }
+
+/* ===================== Estilos específicos deste painel ===================== */
+.wrap { max-width: 1180px; margin: 0 auto; }
+.section { padding: var(--space-8) var(--space-6) var(--space-4); max-width: 1180px; margin: 0 auto; }
+.section + .section { border-top: 1px solid var(--color-divider); }
+.section-head { margin-bottom: var(--space-6); }
+.section-head h2 { margin-bottom: var(--space-1); }
+.section-sub { color: color-mix(in srgb, var(--color-text) 55%, transparent); font-size: 13.5px; }
+.kpi-value { font-size: 26px; font-weight: 500; font-family: var(--font-heading); margin: var(--space-2) 0; white-space: nowrap; }
+.kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); }
+.split-bar { display: flex; height: 14px; border-radius: var(--radius-sm); overflow: hidden; background: var(--color-neutral-800); }
+.legend-row { display: flex; align-items: center; gap: var(--space-2); font-size: 13px; color: var(--color-neutral-300); }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.bar-track-mini { height: 6px; border-radius: var(--radius-sm); background: var(--color-neutral-800); overflow: hidden; margin-top: 6px; }
+.bar-fill-mini { height: 100%; border-radius: var(--radius-sm); background: var(--color-accent); }
+@keyframes live-pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.55); } 50% { opacity: 0.55; box-shadow: 0 0 0 4px rgba(74, 222, 128, 0); } }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; display: inline-block; animation: live-pulse 1.6s ease-in-out infinite; }
+.donut-wrap:hover .donut-label-default { opacity: 0; }
+.donut-wrap:hover .donut-label-hover { opacity: 1; }
+.donut-label-default, .donut-label-hover { transition: opacity 0.15s ease; }
+.donut-label-hover { opacity: 0; }
+.empty { text-align: center; padding: 60px 20px; color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+.login-wrap { display: flex; align-items: center; justify-content: center; min-height: 80vh; padding: var(--space-4); }
+.login-card { width: min(360px, 100%); }
+.login-card h2 { margin-top: 0; }
+.login-card .erro { color: var(--color-red); font-size: 13px; margin-bottom: 4px; }
+
+@media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
 </style>
 </head>
 <body>
-<div class="wrap" id="app"></div>
+<div id="app"></div>
 
 <script>
 // ================== CONFIGURAÇÃO — só isso precisa ser trocado ==================
@@ -98,11 +161,13 @@ function salvarSenha(s){ sessionStorage.setItem('painel_senha', s); }
 function renderLogin(erro){
   document.getElementById('app').innerHTML = `
     <div class="login-wrap">
-      <div class="login-card">
+      <div class="card elev-md login-card">
         <h2>Painel de Vendas — Vitanuts</h2>
         ${erro ? '<div class="erro">Senha incorreta.</div>' : ''}
-        <input type="password" id="senhaInput" placeholder="Senha" autofocus>
-        <button id="btnEntrar">Entrar</button>
+        <div class="field">
+          <input class="input" type="password" id="senhaInput" placeholder="Senha" autofocus>
+        </div>
+        <button class="btn btn-primary" id="btnEntrar">Entrar</button>
       </div>
     </div>
   `;
@@ -138,15 +203,10 @@ async function carregarDados(senha, ehRefreshDeFundo){
     } catch(err){
       const ultimaTentativa = tentativa === MAX_TENTATIVAS;
       if(!ultimaTentativa){
-        // espera um pouco e tenta de novo, sem incomodar ninguém
         await new Promise(r => setTimeout(r, 2000));
         continue;
       }
-      // esgotou as tentativas
       if(ehRefreshDeFundo && dados){
-        // já tinha um painel funcionando na tela — não apaga por causa
-        // de um refresh de fundo que falhou; só tenta de novo no
-        // próximo ciclo automático.
         console.warn('Refresh automático falhou, mantendo painel atual:', err.message);
         return;
       }
@@ -198,61 +258,118 @@ function formatarDataHora(iso){
 function brl(v){ return Number(v || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL', maximumFractionDigits:0}); }
 function escapeHtml(str){ const div = document.createElement('div'); div.textContent = str ?? ''; return div.innerHTML; }
 
-function svgBarrinha(pctRealizado, pctComCarteira){
-  const w = 96, h = 40, r = h/2;
-  const wRealizado = w * pctRealizado;
-  const wComCarteira = w * pctComCarteira;
-  return `
-  <svg viewBox="0 0 ${w} ${h+56}" xmlns="http://www.w3.org/2000/svg">
-    <defs><clipPath id="capsule"><rect x="0" y="0" width="${w}" height="${h}" rx="${r}" ry="${r}"/></clipPath></defs>
-    <g transform="translate(0,8)">
-      <rect x="1" y="1" width="${w-2}" height="${h-2}" rx="${r}" ry="${r}" fill="none" stroke="#B9AF95" stroke-width="1.5" stroke-dasharray="3,3"/>
-      <g clip-path="url(#capsule)">
-        <rect x="0" y="0" width="${wComCarteira}" height="${h}" fill="#E4CD8E" opacity="0.75"/>
-        <rect x="0" y="0" width="${wRealizado}" height="${h}" fill="#3C7A4D"/>
-      </g>
-    </g>
-  </svg>`;
-}
-
+// cores fixas por grupo — mesma paleta em Faturado e Carteira, pra manter
+// o significado consistente entre os dois painéis
 const CORES_GRUPO = {
-  'B2C': 'var(--gold)',
-  'B2B': 'var(--navy)',
-  'Não classificado': 'var(--muted)',
-  'Não identificado': 'var(--muted)'
+  'B2C': 'var(--color-accent-2)',
+  'B2B': 'var(--color-accent)',
+  'Não classificado': 'var(--color-neutral-500)',
+  'Não identificado': 'var(--color-neutral-500)'
 };
 
-function miniCardsGrupo(entradas, total){
-  if(entradas.length === 0) return '<p style="font-size:12.5px;color:var(--muted);">Sem dados neste período ainda.</p>';
-  const cards = entradas.map(([nome, valor, extra]) => {
-    const cor = CORES_GRUPO[nome] || 'var(--muted)';
+function svgDonut(pct, valorLabel, totalLabel){
+  const r = 70, c = 2 * Math.PI * r;
+  const offset = c * (1 - Math.max(0, Math.min(1, pct)));
+  const pctFmt = (pct*100).toFixed(1).replace('.', ',') + '%';
+  return `
+  <div class="donut-wrap" style="cursor: default;">
+    <svg width="164" height="164" viewBox="0 0 160 160" style="flex-shrink: 0;">
+      <circle cx="80" cy="80" r="${r}" fill="none" stroke="var(--color-neutral-800)" stroke-width="18"></circle>
+      <circle cx="80" cy="80" r="${r}" fill="none" stroke="var(--color-accent)" stroke-width="18" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" stroke-linecap="round" transform="rotate(-90 80 80)"></circle>
+      <g class="donut-label-default">
+        <text x="80" y="75" text-anchor="middle" font-family="var(--font-heading)" font-size="26" font-weight="500" fill="var(--color-text)">${pctFmt}</text>
+        <text x="80" y="96" text-anchor="middle" font-family="var(--font-body)" font-size="10.5" letter-spacing="0.04em" fill="var(--color-neutral-400)">DA META</text>
+      </g>
+      <g class="donut-label-hover">
+        <text x="80" y="73" text-anchor="middle" font-family="var(--font-heading)" font-size="16" font-weight="500" fill="var(--color-text)">${escapeHtml(valorLabel)}</text>
+        <text x="80" y="90" text-anchor="middle" font-family="var(--font-body)" font-size="9.5" letter-spacing="0.04em" fill="var(--color-neutral-400)">FATURAMENTO ATUAL</text>
+        <text x="80" y="104" text-anchor="middle" font-family="var(--font-body)" font-size="9.5" letter-spacing="0.04em" fill="var(--color-neutral-400)">de ${escapeHtml(totalLabel)}</text>
+      </g>
+    </svg>
+  </div>`;
+}
+
+function splitBar(entradas, total){
+  if(entradas.length === 0) return '<p class="text-muted" style="font-size:13px;">Sem dados neste período ainda.</p>';
+  const segmentos = entradas.map(([nome, valor]) => {
     const pct = total > 0 ? (valor/total*100) : 0;
-    return `
-    <div class="mini-card">
-      <div class="mc-label"><span class="dot" style="background:${cor}"></span>${escapeHtml(nome)}</div>
-      <div class="mc-value">${brl(valor)}</div>
-      <div class="mc-sub">${extra ? extra + ' · ' : ''}${pct.toFixed(1)}% do total</div>
-      <div class="mc-bar"><div class="mc-bar-fill" style="width:${pct.toFixed(0)}%;background:${cor}"></div></div>
-    </div>`;
+    const cor = CORES_GRUPO[nome] || 'var(--color-neutral-500)';
+    return `<div style="width:${pct.toFixed(2)}%;background:${cor};"></div>`;
   }).join('');
-  return `<div class="mini-cards">${cards}</div>`;
+  const legendas = entradas.map(([nome, valor, extra]) => {
+    const pct = total > 0 ? (valor/total*100) : 0;
+    const cor = CORES_GRUPO[nome] || 'var(--color-neutral-500)';
+    return `<div class="legend-row"><span class="legend-dot" style="background:${cor}"></span>${escapeHtml(nome)} · ${brl(valor)} (${pct.toFixed(1).replace('.',',')}%)${extra ? ' · ' + escapeHtml(extra) : ''}</div>`;
+  }).join('');
+  return `<div class="split-bar" style="margin: var(--space-3) 0;">${segmentos}</div><div style="display:flex;gap:var(--space-6);flex-wrap:wrap;">${legendas}</div>`;
 }
 
 function rankingTable(lista){
-  if(!lista || lista.length === 0) return '<p style="font-size:12.5px;color:var(--muted);">Sem vendas de produto registradas neste mês ainda.</p>';
-  const total = lista.reduce((s,p)=>s+p.valor,0);
+  if(!lista || lista.length === 0) return '<p class="text-muted" style="font-size:13px;">Sem vendas de produto registradas neste mês ainda.</p>';
   const maior = lista.length ? lista[0].valor : 1;
+  const total = lista.reduce((s,p)=>s+p.valor,0);
+  const TAG_CANAL = { 'B2C': 'tag-accent-2', 'B2B': 'tag-accent', 'Não classificado': 'tag-neutral' };
   const linhas = lista.map(p => `
     <tr>
       <td>
-        <div class="prod-name">${escapeHtml(p.nome)}</div>
-        <div class="prod-sku">${escapeHtml(p.sku)}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${(p.valor/maior*100).toFixed(0)}%"></div></div>
+        <div style="font-weight:500;">${escapeHtml(p.nome)}</div>
+        <div class="text-muted" style="font-size:11px;margin-top:1px;">${escapeHtml(p.sku)}</div>
+        <div class="bar-track-mini"><div class="bar-fill-mini" style="width:${(p.valor/maior*100).toFixed(0)}%"></div></div>
       </td>
+      <td><span class="tag ${TAG_CANAL[p.canal_predominante] || 'tag-neutral'}">${escapeHtml(p.canal_predominante || '—')}</span></td>
+      <td class="num">${Number(p.quantidade || 0).toLocaleString('pt-BR')}</td>
       <td class="num">${brl(p.valor)}</td>
-      <td class="pct">${total>0 ? (p.valor/total*100).toFixed(1) : '0.0'}%</td>
+      <td class="num text-muted">${total>0 ? (p.valor/total*100).toFixed(1).replace('.',',') : '0,0'}%</td>
     </tr>`).join('');
-  return `<table><thead><tr><th>Produto</th><th class="num">Real R$</th><th class="pct">% do top 10</th></tr></thead><tbody>${linhas}</tbody></table>`;
+  return `<table class="table"><thead><tr><th>Produto</th><th>Canal</th><th class="num">Qtd.</th><th class="num">Real R$</th><th class="num">% do top 10</th></tr></thead><tbody>${linhas}</tbody></table>`;
+}
+
+// Faturamento por UF — barras horizontais, ordenadas do maior pro menor.
+function regioesBars(grupoRegioes){
+  const entradas = Object.entries(grupoRegioes || {}).filter(([,v]) => v > 0).sort((a,b) => b[1]-a[1]);
+  if(entradas.length === 0) return '<p class="text-muted" style="font-size:13px;">Sem dados de região neste período ainda.</p>';
+  const total = entradas.reduce((s,[,v])=>s+v, 0);
+  const maior = entradas[0][1];
+  const linhas = entradas.map(([uf, valor]) => `
+    <div style="display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:var(--space-3);margin-bottom:var(--space-2);">
+      <span style="font-weight:500;font-size:13px;">${escapeHtml(uf)}</span>
+      <div class="bar-track-mini" style="margin-top:0;"><div class="bar-fill-mini" style="width:${(valor/maior*100).toFixed(0)}%"></div></div>
+      <span class="num text-muted" style="font-size:12.5px;white-space:nowrap;">${brl(valor)} · ${total>0 ? (valor/total*100).toFixed(1).replace('.',',') : '0,0'}%</span>
+    </div>`).join('');
+  return linhas;
+}
+
+// Tendência diária acumulada — linha simples em SVG, sem depender de
+// nenhuma biblioteca de gráfico.
+function tendenciaSvg(serie, metaMes){
+  if(!serie || serie.length === 0) return '<p class="text-muted" style="font-size:13px;">Sem dados suficientes ainda.</p>';
+  const w = 600, h = 160, pad = 8;
+  const maiorValor = Math.max(metaMes, ...serie.map(p => p.acumulado), 1);
+  const pontos = serie.map((p, i) => {
+    const x = serie.length > 1 ? (i / (serie.length - 1)) * (w - pad*2) + pad : pad;
+    const y = h - pad - (p.acumulado / maiorValor) * (h - pad*2);
+    return x.toFixed(1) + ',' + y.toFixed(1);
+  }).join(' ');
+  const ultimo = serie[serie.length - 1];
+  const xUltimo = serie.length > 1 ? (w - pad*2) + pad : pad;
+  const yUltimo = h - pad - (ultimo.acumulado / maiorValor) * (h - pad*2);
+  const yMeta = h - pad - (metaMes / maiorValor) * (h - pad*2);
+  return `
+  <svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="display:block;">
+    <line x1="${pad}" y1="${yMeta.toFixed(1)}" x2="${w-pad}" y2="${yMeta.toFixed(1)}" stroke="var(--color-neutral-500)" stroke-width="1" stroke-dasharray="4,4"></line>
+    <polyline points="${pontos}" fill="none" stroke="var(--color-accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></polyline>
+    <circle cx="${xUltimo.toFixed(1)}" cy="${yUltimo.toFixed(1)}" r="3.5" fill="var(--color-accent)"></circle>
+  </svg>`;
+}
+
+function kpiCard(label, value, tagText, tagClass, statusDot){
+  const dot = statusDot ? `<span style="width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;background:${statusDot};"></span>` : '';
+  return `
+  <div class="card elev-sm">
+    <div class="card-kicker" style="display:flex;align-items:center;">${dot}${escapeHtml(label)}</div>
+    <div class="kpi-value">${value}</div>
+    ${tagText ? `<span class="tag ${tagClass}">${escapeHtml(tagText)}</span>` : ''}
+  </div>`;
 }
 
 function render(){
@@ -273,85 +390,128 @@ function render(){
   const realMaisCarteira = faturamentoReal + carteiraValor;
   const gapCarteira = Math.max(metaMes - realMaisCarteira, 0);
   const pctRealizado = metaMes > 0 ? Math.min(faturamentoReal / metaMes, 1) : 0;
-  const pctRealCarteira = metaMes > 0 ? Math.min(realMaisCarteira / metaMes, 1) : 0;
 
   const grupoFaturado = dados.grupo_faturado || {};
   const grupoCarteira = (dados.carteira && dados.carteira.grupo) || {};
 
   const avisoSync = dados.sincronizacao_completa === false
-    ? `<div class="badge warn" style="margin-bottom:12px;display:inline-block;">Sincronizando histórico do mês: ${dados.notas_com_itens_processados}/${dados.total_notas} notas processadas</div><br>`
+    ? `<span class="tag tag-amber" style="margin-bottom:12px;display:inline-block;">Sincronizando histórico do mês: ${dados.notas_com_itens_processados}/${dados.total_notas} notas processadas</span><br>`
     : '';
 
   const debugCarteira = dados.carteira && dados.carteira.debug;
   const avisoCarteira = ((dados.carteira && dados.carteira.total_pedidos) === 0 && debugCarteira && debugCarteira.erro_http)
-    ? `<div class="badge off" style="margin-bottom:12px;display:inline-block;">Carteira não carregou: erro ${debugCarteira.erro_http.status} ao buscar pedidos no Bling (ver Registros de execução no Apps Script)</div><br>`
+    ? `<span class="tag tag-red" style="margin-bottom:12px;display:inline-block;">Carteira não carregou: erro ${debugCarteira.erro_http.status} ao buscar pedidos no Bling</span><br>`
     : '';
 
   document.getElementById('app').innerHTML = `
-    <div class="toolbar">
-      <div>
-        <h1>Painel de Vendas — Vitanuts</h1>
-        <div class="sub">Gerado em ${formatarDataHora(dados.gerado_em)} · ${dados.total_notas} notas no período (${dados.periodo_inicio} a ${dados.periodo_fim})</div>
-      </div>
-      <span class="badge">atualização automática</span>
-    </div>
+    <nav class="nav">
+      <span class="nav-brand">Vitanuts</span>
+      <span class="text-muted" style="font-size:12.5px;">Painel de Vendas</span>
+      <span style="margin-left:auto;display:flex;align-items:center;gap:var(--space-3);">
+        <span class="text-muted" style="font-size:12px;">Atualizado em ${formatarDataHora(dados.gerado_em)}</span>
+        <span class="tag tag-outline" style="display:flex;align-items:center;gap:var(--space-2);"><span class="live-dot"></span>${dados.total_notas} notas no período</span>
+      </span>
+    </nav>
 
-    ${avisoSync}
-    ${avisoCarteira}
-    <div class="meta-card">
-      <div class="barrinha">
-        ${svgBarrinha(pctRealizado, pctRealCarteira)}
-        <div class="pct">${(pctRealizado*100).toFixed(0)}%</div>
+    <section class="section">
+      <div class="section-head">
+        <div class="card-kicker" style="opacity:0.7;">Visão geral</div>
+        <h2>Faturamento do mês</h2>
+        <p class="section-sub">${dados.periodo_inicio} a ${dados.periodo_fim}</p>
       </div>
-      <div class="meta-text">
-        <h2>Meta do mês: quanto da barrinha já foi preenchida</h2>
-        <p>O contorno claro mostra o que ainda falta vender; o preenchimento verde é o realizado, e o dourado translúcido soma o realizado + carteira em aberto.</p>
-        <div class="legend">
-          <span><span class="dot green"></span>Realizado&nbsp; ${(pctRealizado*100).toFixed(1)}%</span>
-          <span><span class="dot gold"></span>Realizado + carteira&nbsp; ${(pctRealCarteira*100).toFixed(1)}%</span>
-          <span><span class="dot outline"></span>Meta&nbsp; R$ ${metaMes.toLocaleString('pt-BR')}</span>
+      ${avisoSync}${avisoCarteira}
+      <div class="card elev-md" style="margin-bottom: var(--space-4); display: grid; grid-template-columns: auto 1px 1fr; align-items: center; gap: var(--space-8); padding: var(--space-8);">
+        ${svgDonut(pctRealizado, brl(faturamentoReal), brl(metaMes))}
+        <div style="width: 1px; height: 96px; background: var(--color-divider);"></div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-6);">
+          <div>
+            <div class="card-kicker" style="display:flex;align-items:center;gap:var(--space-2);"><span style="width:9px;height:9px;border-radius:50%;background:${faturamentoReal>=metaMes?'var(--color-green)':'var(--color-red)'};display:inline-block;"></span>Faturamento real</div>
+            <div class="kpi-value">${brl(faturamentoReal)}</div>
+            <span class="tag tag-outline">${(pctRealizado*100).toFixed(1).replace('.',',')}% da meta</span>
+          </div>
+          <div>
+            <div class="card-kicker">Meta do mês</div>
+            <div class="kpi-value">${brl(metaMes)}</div>
+            <span class="tag tag-neutral">fixa por enquanto</span>
+          </div>
+          <div>
+            <div class="card-kicker" style="display:flex;align-items:center;gap:var(--space-2);"><span style="width:9px;height:9px;border-radius:50%;background:var(--color-red);display:inline-block;"></span>Gap até a meta</div>
+            <div class="kpi-value">${brl(gapMeta)}</div>
+            <span class="tag tag-red">${(100-pctRealizado*100).toFixed(1).replace('.',',')}% faltando</span>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="kpi-grid">
-      <div class="kpi"><div class="label">Faturamento real</div><div class="value">${brl(faturamentoReal)}</div><div class="delta neutral">${(pctRealizado*100).toFixed(1)}% da meta</div></div>
-      <div class="kpi"><div class="label">Meta do mês</div><div class="value">${brl(metaMes)}</div><div class="delta neutral">fixa por enquanto</div></div>
-      <div class="kpi"><div class="label">Gap até a meta</div><div class="value">${brl(gapMeta)}</div><div class="delta bad">${(100-pctRealizado*100).toFixed(1)}% faltando</div></div>
-      <div class="kpi"><div class="label">Carteira em aberto</div><div class="value">${brl(carteiraValor)}</div><div class="delta neutral">${dados.carteira ? dados.carteira.total_pedidos + ' pedidos' : '-'}</div></div>
-      <div class="kpi"><div class="label">Real + carteira</div><div class="value">${brl(realMaisCarteira)}</div><div class="delta good">${(pctRealCarteira*100).toFixed(1)}% da meta se fechar tudo</div></div>
-      <div class="kpi"><div class="label">Tendência de fechamento</div><div class="value">${brl(tendencia)}</div><div class="delta ${tendencia>=metaMes?'good':'bad'}">${metaMes>0 ? ((tendencia/metaMes)*100).toFixed(1) : '0'}% da meta projetada</div></div>
-      <div class="kpi"><div class="label">Clientes positivados</div><div class="value">${clientesPositivados}</div><div class="delta neutral">clientes com faturamento no mês</div></div>
-      <div class="kpi"><div class="label">Gap se carteira fechar</div><div class="value">${brl(gapCarteira)}</div><div class="delta bad">${metaMes>0 ? ((gapCarteira/metaMes)*100).toFixed(1) : '0'}% ainda faltaria</div></div>
-    </div>
+      <div class="kpi-grid">
+        ${kpiCard('Carteira em aberto', brl(carteiraValor), dados.carteira ? dados.carteira.total_pedidos + ' pedidos' : '-', 'tag-neutral')}
+        ${kpiCard('Real + carteira', brl(realMaisCarteira), (metaMes>0 ? ((realMaisCarteira/metaMes)*100).toFixed(1).replace('.',',') : '0') + '% da meta se fechar tudo', 'tag-accent')}
+        ${kpiCard('Tendência de fechamento', brl(tendencia), (metaMes>0 ? ((tendencia/metaMes)*100).toFixed(1).replace('.',',') : '0') + '% da meta projetada', tendencia>=metaMes ? 'tag-accent' : 'tag-red')}
+        ${kpiCard('Clientes positivados', String(clientesPositivados), 'no mês', 'tag-neutral')}
+      </div>
+    </section>
 
-    <div class="panels">
-      <div class="panel">
-        <h3>Faturado — B2C × B2B</h3>
-        <div class="sub">Divisão do faturamento real do mês por classificação da nota${valorAmostras > 0 ? ` — não inclui ${brl(valorAmostras)} em ${qtdNotasAmostra} nota(s) de amostra/divulgação (sem valor comercial, não contam pra meta)` : ''}</div>
-        ${miniCardsGrupo(
+    <section class="section" id="faturado">
+      <div class="section-head">
+        <div class="card-kicker" style="opacity:0.7;">Faturado</div>
+        <h2>B2C × B2B</h2>
+        <p class="section-sub">Divisão do faturamento real do mês por classificação da nota${valorAmostras > 0 ? ` — não inclui ${brl(valorAmostras)} em ${qtdNotasAmostra} nota(s) de amostra/divulgação` : ''}</p>
+      </div>
+      <div class="card elev-sm">
+        ${splitBar(
           Object.entries(grupoFaturado)
             .filter(([,v]) => v.valor > 0 || v.clientes > 0)
             .map(([nome, v]) => [nome, v.valor, v.clientes + ' clientes']),
           Object.values(grupoFaturado).reduce((s,v)=>s+v.valor,0)
         )}
       </div>
+    </section>
 
-      <div class="panel">
-        <h3>Carteira em aberto — B2C × B2B</h3>
-        <div class="sub">Divisão dos pedidos ainda não faturados por tipo de cliente</div>
-        ${miniCardsGrupo(
+    <section class="section" id="carteira">
+      <div class="section-head">
+        <div class="card-kicker" style="opacity:0.7;">Carteira</div>
+        <h2>Pedidos em aberto — B2C × B2B</h2>
+        <p class="section-sub">Divisão dos pedidos ainda não faturados por tipo de cliente</p>
+      </div>
+      <div class="card elev-sm">
+        ${splitBar(
           Object.entries(grupoCarteira).filter(([,v]) => v > 0),
           Object.values(grupoCarteira).reduce((s,v)=>s+v,0)
         )}
       </div>
+    </section>
 
-      <div class="panel">
-        <h3>Ranking de produtos por faturamento real</h3>
-        <div class="sub">Quem está puxando o resultado do mês — top 10 por faturamento real</div>
+    <section class="section" id="tendencia">
+      <div class="section-head">
+        <div class="card-kicker" style="opacity:0.7;">Tendência</div>
+        <h2>Faturamento acumulado no mês</h2>
+        <p class="section-sub">Soma dia a dia desde o dia 1 — a linha tracejada é a meta do mês</p>
+      </div>
+      <div class="card elev-sm">
+        ${tendenciaSvg(dados.tendencia_diaria, metaMes)}
+      </div>
+    </section>
+
+    <section class="section" id="produtos">
+      <div class="section-head">
+        <div class="card-kicker" style="opacity:0.7;">Produtos</div>
+        <h2>Ranking por faturamento real</h2>
+        <p class="section-sub">Quem está puxando o resultado do mês — top 10, com quantidade e canal predominante</p>
+      </div>
+      <div class="card elev-sm">
         ${rankingTable(dados.ranking_produtos)}
       </div>
-    </div>
+    </section>
+
+    <section class="section" id="regioes">
+      <div class="section-head">
+        <div class="card-kicker" style="opacity:0.7;">Regiões</div>
+        <h2>Faturamento por estado</h2>
+        <p class="section-sub">Soma do faturamento real do mês por UF do cliente</p>
+      </div>
+      <div class="card elev-sm">
+        ${regioesBars(dados.grupo_regioes)}
+      </div>
+    </section>
   `;
 }
 
