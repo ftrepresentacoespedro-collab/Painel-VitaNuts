@@ -144,6 +144,11 @@ p { margin: 0 0 var(--space-3); }
 
 @media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
 .map-legend-track { flex: 1; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--color-neutral-800), var(--color-accent)); }
+.widget-flutuante { position: fixed; bottom: 24px; right: 24px; z-index: 500; }
+.widget-flutuante-botao { width: 50px; height: 50px; border-radius: 50%; background: var(--color-accent-600); color: #fff; border: none; cursor: pointer; box-shadow: var(--shadow-lg); font-size: 20px; display: flex; align-items: center; justify-content: center; }
+.widget-flutuante-botao:hover { background: var(--color-accent-700); }
+.widget-flutuante-painel { display: none; position: absolute; bottom: 60px; right: 0; width: 220px; background: var(--color-surface); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); padding: var(--space-4); }
+.widget-flutuante.aberto .widget-flutuante-painel { display: block; }
 </style>
 <script src="https://unpkg.com/d3@7/dist/d3.min.js"></script>
 </head>
@@ -361,24 +366,50 @@ function tendenciaSvg(serie, metaMes){
   // a curva ficava "achatada" perto do fundo sempre que o acumulado
   // ainda estivesse bem abaixo dela (comum no início do mês).
   const maiorValor = Math.max(...serie.map(p => p.acumulado), 1);
-  const pontos = serie.map((p, i) => {
+  const coordenadas = serie.map((p, i) => {
     const x = serie.length > 1 ? (i / (serie.length - 1)) * (w - pad*2) + pad : pad;
     const y = h - pad - (p.acumulado / maiorValor) * (h - pad*2);
-    return x.toFixed(1) + ',' + y.toFixed(1);
-  }).join(' ');
-  const ultimo = serie[serie.length - 1];
-  const xUltimo = serie.length > 1 ? (w - pad*2) + pad : pad;
-  const yUltimo = h - pad - (ultimo.acumulado / maiorValor) * (h - pad*2);
+    return { x, y, dia: p.dia, acumulado: p.acumulado };
+  });
+  const pontos = coordenadas.map(c => c.x.toFixed(1) + ',' + c.y.toFixed(1)).join(' ');
+  const ultimo = coordenadas[coordenadas.length - 1];
   // se a meta estiver acima do topo do gráfico, a linha tracejada fica
   // "encostada" no topo em vez de sumir pra fora da área visível
   const yMetaBruto = h - pad - (metaMes / maiorValor) * (h - pad*2);
   const yMeta = Math.max(pad, yMetaBruto);
+  // pontos invisíveis maiores (mais fáceis de acertar o mouse) em cada
+  // dia, usados só pra mostrar o tooltip com o valor daquele dia
+  const pontosHover = coordenadas.map(c =>
+    `<circle class="ponto-hover" cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="10" fill="transparent" style="cursor:pointer;" data-dia="${c.dia}" data-valor="${c.acumulado}"></circle>`
+  ).join('');
   return `
   <svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="display:block;">
     <line x1="${pad}" y1="${yMeta.toFixed(1)}" x2="${w-pad}" y2="${yMeta.toFixed(1)}" stroke="var(--color-neutral-500)" stroke-width="1" stroke-dasharray="4,4"></line>
     <polyline points="${pontos}" fill="none" stroke="var(--color-accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></polyline>
-    <circle cx="${xUltimo.toFixed(1)}" cy="${yUltimo.toFixed(1)}" r="3.5" fill="var(--color-accent)"></circle>
+    <circle cx="${ultimo.x.toFixed(1)}" cy="${ultimo.y.toFixed(1)}" r="3.5" fill="var(--color-accent)"></circle>
+    ${pontosHover}
   </svg>`;
+}
+
+// Liga o hover nos pontos do gráfico de tendência — precisa rodar depois
+// que o HTML já está na página (os elementos ainda não existem antes disso).
+function ligarHoverTendencia(){
+  const tooltip = garantirTooltip();
+  document.querySelectorAll('#tendencia-svg-alvo .ponto-hover').forEach(ponto => {
+    ponto.addEventListener('mouseenter', () => {
+      const dia = ponto.getAttribute('data-dia');
+      const valor = Number(ponto.getAttribute('data-valor'));
+      tooltip.textContent = 'Dia ' + dia + ' — ' + brl(valor) + ' acumulado';
+      tooltip.style.display = 'block';
+    });
+    ponto.addEventListener('mousemove', (e) => {
+      tooltip.style.left = (e.clientX + 14) + 'px';
+      tooltip.style.top = (e.clientY + 14) + 'px';
+    });
+    ponto.addEventListener('mouseleave', () => {
+      tooltip.style.display = 'none';
+    });
+  });
 }
 
 // Mapa do Brasil por UF — geometria real buscada 1x da API pública do
@@ -416,11 +447,11 @@ async function buscarGeometriaMapa(){
 // Tooltip flutuante customizado (em vez do title nativo do navegador,
 // que é feio e não combina com o resto do painel). Um único elemento
 // reaproveitado, reposicionado conforme o mouse se move sobre o SVG.
-function garantirTooltipMapa(){
-  let tt = document.getElementById('mapa-tooltip');
+function garantirTooltip(){
+  let tt = document.getElementById('painel-tooltip');
   if(!tt){
     tt = document.createElement('div');
-    tt.id = 'mapa-tooltip';
+    tt.id = 'painel-tooltip';
     tt.style.cssText = 'position:fixed;pointer-events:none;z-index:1000;background:var(--color-neutral-100);color:var(--color-neutral-900);font-size:12.5px;font-weight:500;padding:6px 10px;border-radius:var(--radius-sm);box-shadow:var(--shadow-md);display:none;white-space:nowrap;';
     document.body.appendChild(tt);
   }
@@ -432,7 +463,7 @@ function renderizarMapaComFiltro(alvoSvg, geometria, grupoRegioes, canal){
   Object.entries(grupoRegioes || {}).forEach(([uf, reg]) => { valores[uf] = valorRegiaoPorCanal(reg, canal); });
   const total = Object.values(valores).reduce((s,v)=>s+v, 0);
   const maior = Math.max(1, ...Object.values(valores));
-  const tooltip = garantirTooltipMapa();
+  const tooltip = garantirTooltip();
 
   alvoSvg.innerHTML = geometria.map(f => {
     const uf = CODIGO_IBGE_PARA_UF[f.codigo] || '';
@@ -471,24 +502,87 @@ async function tentarRenderizarMapa(grupoRegioes){
     const alvoAtual = document.getElementById('mapa-svg-alvo');
     if(!alvoAtual) return;
     renderizarMapaComFiltro(alvoAtual, geometria, grupoRegioes, MAPA_CANAL_ATUAL);
-
-    // liga o filtro de canal, se ainda não estiver ligado
-    const select = document.getElementById('mapa-filtro-canal');
-    if(select && !select.dataset.ligado){
-      select.dataset.ligado = '1';
-      select.addEventListener('change', () => {
-        MAPA_CANAL_ATUAL = select.value;
-        const svgAtual = document.getElementById('mapa-svg-alvo');
-        if(svgAtual) renderizarMapaComFiltro(svgAtual, geometria, grupoRegioes, MAPA_CANAL_ATUAL);
-        const rotulo = document.getElementById('mapa-status-label');
-        if(rotulo) rotulo.textContent = 'Coloração por faturamento — ' + (MAPA_CANAL_ATUAL === 'todos' ? 'Todos os canais' : MAPA_CANAL_ATUAL);
-      });
-    }
   } catch(err){
     const alvoAtual = document.getElementById('mapa-svg-alvo');
     if(alvoAtual) alvoAtual.closest('.mapa-wrap').innerHTML = '<p class="text-muted" style="font-size:13px;">Não foi possível carregar o mapa agora — veja a lista por estado abaixo.</p>';
     console.warn('Não foi possível carregar o mapa do Brasil:', err.message);
   }
+}
+
+// Liga o dropdown de canal — atualiza a LISTA sempre (não depende do
+// mapa ter carregado) e o MAPA quando a geometria já estiver disponível.
+// Fica fora de tentarRenderizarMapa de propósito: se o mapa falhar, o
+// filtro continua funcionando normalmente na lista.
+function ligarFiltroRegioes(grupoRegioes){
+  const select = document.getElementById('mapa-filtro-canal');
+  if(!select || select.dataset.ligado) return;
+  select.dataset.ligado = '1';
+  select.value = MAPA_CANAL_ATUAL;
+  select.addEventListener('change', () => {
+    MAPA_CANAL_ATUAL = select.value;
+
+    const listaAtual = document.getElementById('regioes-lista-alvo');
+    if(listaAtual) listaAtual.innerHTML = regioesBars(grupoRegioes, MAPA_CANAL_ATUAL);
+
+    if(MAPA_GEOMETRIA_CACHE){
+      const svgAtual = document.getElementById('mapa-svg-alvo');
+      if(svgAtual) renderizarMapaComFiltro(svgAtual, MAPA_GEOMETRIA_CACHE, grupoRegioes, MAPA_CANAL_ATUAL);
+    }
+
+    const rotulo = document.getElementById('mapa-status-label');
+    if(rotulo) rotulo.textContent = 'Coloração por faturamento — ' + (MAPA_CANAL_ATUAL === 'todos' ? 'Todos os canais' : MAPA_CANAL_ATUAL);
+  });
+}
+
+// Widget flutuante — mostra o faturamento de um dia específico do mês,
+// filtrado por canal. Só usa o array faturamento_por_dia que já veio
+// junto com o resto dos dados — nenhuma busca nova.
+function widgetFaturamentoPorDiaHtml(){
+  return `
+  <div class="widget-flutuante" id="widget-flutuante">
+    <div class="widget-flutuante-painel">
+      <div class="card-kicker" style="margin-bottom:var(--space-3);">Faturamento por dia</div>
+      <div class="field" style="margin-bottom:var(--space-3);">
+        <label for="widget-dia">Dia</label>
+        <select class="input" id="widget-dia"></select>
+      </div>
+      <div class="field" style="margin-bottom:var(--space-3);">
+        <label for="widget-canal">Canal</label>
+        <select class="input" id="widget-canal">
+          <option value="total">Geral</option>
+          <option value="B2B">B2B</option>
+          <option value="B2C">B2C</option>
+        </select>
+      </div>
+      <div class="kpi-value" id="widget-valor" style="font-size:20px;">R$ 0</div>
+    </div>
+    <button class="widget-flutuante-botao" id="widget-flutuante-botao" title="Faturamento por dia">📅</button>
+  </div>`;
+}
+
+function ligarWidgetFaturamentoPorDia(porDia){
+  const wrap = document.getElementById('widget-flutuante');
+  const botao = document.getElementById('widget-flutuante-botao');
+  const selectDia = document.getElementById('widget-dia');
+  const selectCanal = document.getElementById('widget-canal');
+  const valorEl = document.getElementById('widget-valor');
+  if(!wrap || !botao || !selectDia || !selectCanal || !valorEl) return;
+
+  botao.addEventListener('click', () => wrap.classList.toggle('aberto'));
+
+  selectDia.innerHTML = porDia.map(d => `<option value="${d.dia}">Dia ${d.dia}</option>`).join('');
+  if(porDia.length > 0) selectDia.value = String(porDia[porDia.length-1].dia);
+
+  function atualizarValor(){
+    const diaEscolhido = Number(selectDia.value);
+    const canalEscolhido = selectCanal.value; // 'total' | 'B2B' | 'B2C'
+    const registro = porDia.find(d => d.dia === diaEscolhido);
+    valorEl.textContent = brl(registro ? (registro[canalEscolhido] || 0) : 0);
+  }
+
+  selectDia.addEventListener('change', atualizarValor);
+  selectCanal.addEventListener('change', atualizarValor);
+  atualizarValor();
 }
 
 function kpiCard(label, value, tagText, tagClass, statusDot){
@@ -519,6 +613,13 @@ function render(){
   const realMaisCarteira = faturamentoReal + carteiraValor;
   const gapCarteira = Math.max(metaMes - realMaisCarteira, 0);
   const pctRealizado = metaMes > 0 ? Math.min(faturamentoReal / metaMes, 1) : 0;
+
+  const tendenciaB2C = Number(dados.tendencia_b2c || 0);
+  const tendenciaB2B = Number(dados.tendencia_b2b || 0);
+  const clientesPorCanal = dados.clientes_positivados_por_canal || {};
+  const porDia = dados.faturamento_por_dia || [];
+  const hojeDado = porDia.length > 0 ? porDia[porDia.length-1] : { total:0, B2C:0, B2B:0 };
+  const ontemDado = porDia.length > 1 ? porDia[porDia.length-2] : null;
 
   const grupoFaturado = dados.grupo_faturado || {};
   const grupoCarteira = (dados.carteira && dados.carteira.grupo) || {};
@@ -576,6 +677,26 @@ function render(){
         ${kpiCard('Real + carteira', brl(realMaisCarteira), (metaMes>0 ? ((realMaisCarteira/metaMes)*100).toFixed(1).replace('.',',') : '0') + '% da meta se fechar tudo', 'tag-accent')}
         ${kpiCard('Tendência de fechamento', brl(tendencia), (metaMes>0 ? ((tendencia/metaMes)*100).toFixed(1).replace('.',',') : '0') + '% da meta projetada', tendencia>=metaMes ? 'tag-accent' : 'tag-red')}
         ${kpiCard('Clientes positivados', String(clientesPositivados), 'no mês', 'tag-neutral')}
+        ${kpiCard('Tendência B2C', brl(tendenciaB2C), 'projeção de fim de mês', 'tag-accent-2')}
+        ${kpiCard('Tendência B2B', brl(tendenciaB2B), 'projeção de fim de mês', 'tag-accent')}
+        ${kpiCard('Clientes positivados B2C', String(clientesPorCanal.B2C || 0), 'no mês', 'tag-accent-2')}
+        ${kpiCard('Clientes positivados B2B', String(clientesPorCanal.B2B || 0), 'no mês', 'tag-accent')}
+      </div>
+
+      <div class="card elev-sm" style="margin-top: var(--space-4);">
+        <div class="card-kicker">Faturamento diário</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-6);margin-top:var(--space-2);">
+          <div>
+            <div class="text-muted" style="font-size:12px;">Hoje</div>
+            <div class="kpi-value" style="font-size:22px;">${brl(hojeDado.total)}</div>
+            <div style="font-size:12px;color:var(--color-neutral-400);margin-top:2px;">B2C: ${brl(hojeDado.B2C)} · B2B: ${brl(hojeDado.B2B)}</div>
+          </div>
+          <div>
+            <div class="text-muted" style="font-size:12px;">Ontem</div>
+            <div class="kpi-value" style="font-size:22px;">${ontemDado ? brl(ontemDado.total) : '—'}</div>
+            <div style="font-size:12px;color:var(--color-neutral-400);margin-top:2px;">${ontemDado ? ('B2C: ' + brl(ontemDado.B2C) + ' · B2B: ' + brl(ontemDado.B2B)) : 'Mês começou hoje'}</div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -615,7 +736,7 @@ function render(){
         <h2>Faturamento acumulado no mês</h2>
         <p class="section-sub">Soma dia a dia desde o dia 1 — a linha tracejada é a meta do mês</p>
       </div>
-      <div class="card elev-sm">
+      <div class="card elev-sm" id="tendencia-svg-alvo">
         ${tendenciaSvg(dados.tendencia_diaria, metaMes)}
       </div>
     </section>
@@ -664,15 +785,22 @@ function render(){
       </div>
 
       <div class="card-kicker" style="margin-bottom:var(--space-2);">Lista por estado</div>
-      <div class="card elev-sm">
-        ${regioesBars(dados.grupo_regioes, 'todos')}
+      <div class="card elev-sm" id="regioes-lista-alvo">
+        ${regioesBars(dados.grupo_regioes, MAPA_CANAL_ATUAL)}
       </div>
     </section>
+
+    ${widgetFaturamentoPorDiaHtml()}
   `;
 
+  // liga o filtro de canal (afeta mapa E lista), o hover do gráfico de
+  // tendência, o widget flutuante de faturamento por dia e, separadamente,
   // tenta desenhar o mapa do Brasil de verdade por cima do placeholder —
-  // se falhar (rede, IBGE fora do ar), mostra um aviso só na área do
-  // mapa; a lista logo abaixo nunca depende disso.
+  // se falhar (rede, IBGE fora do ar), mostra um aviso só na área do mapa;
+  // o resto continua funcionando normalmente.
+  ligarFiltroRegioes(dados.grupo_regioes);
+  ligarHoverTendencia();
+  ligarWidgetFaturamentoPorDia(porDia);
   tentarRenderizarMapa(dados.grupo_regioes);
 }
 
