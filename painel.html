@@ -143,7 +143,9 @@ p { margin: 0 0 var(--space-3); }
 .login-card .erro { color: var(--color-red); font-size: 13px; margin-bottom: 4px; }
 
 @media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+.map-legend-track { flex: 1; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--color-neutral-800), var(--color-accent)); }
 </style>
+<script src="https://unpkg.com/d3@7/dist/d3.min.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -344,7 +346,10 @@ function regioesBars(grupoRegioes){
 function tendenciaSvg(serie, metaMes){
   if(!serie || serie.length === 0) return '<p class="text-muted" style="font-size:13px;">Sem dados suficientes ainda.</p>';
   const w = 600, h = 160, pad = 8;
-  const maiorValor = Math.max(metaMes, ...serie.map(p => p.acumulado), 1);
+  // escala pelo maior valor da PRÓPRIA série — se escalasse pela meta,
+  // a curva ficava "achatada" perto do fundo sempre que o acumulado
+  // ainda estivesse bem abaixo dela (comum no início do mês).
+  const maiorValor = Math.max(...serie.map(p => p.acumulado), 1);
   const pontos = serie.map((p, i) => {
     const x = serie.length > 1 ? (i / (serie.length - 1)) * (w - pad*2) + pad : pad;
     const y = h - pad - (p.acumulado / maiorValor) * (h - pad*2);
@@ -353,13 +358,82 @@ function tendenciaSvg(serie, metaMes){
   const ultimo = serie[serie.length - 1];
   const xUltimo = serie.length > 1 ? (w - pad*2) + pad : pad;
   const yUltimo = h - pad - (ultimo.acumulado / maiorValor) * (h - pad*2);
-  const yMeta = h - pad - (metaMes / maiorValor) * (h - pad*2);
+  // se a meta estiver acima do topo do gráfico, a linha tracejada fica
+  // "encostada" no topo em vez de sumir pra fora da área visível
+  const yMetaBruto = h - pad - (metaMes / maiorValor) * (h - pad*2);
+  const yMeta = Math.max(pad, yMetaBruto);
   return `
   <svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="display:block;">
     <line x1="${pad}" y1="${yMeta.toFixed(1)}" x2="${w-pad}" y2="${yMeta.toFixed(1)}" stroke="var(--color-neutral-500)" stroke-width="1" stroke-dasharray="4,4"></line>
     <polyline points="${pontos}" fill="none" stroke="var(--color-accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></polyline>
     <circle cx="${xUltimo.toFixed(1)}" cy="${yUltimo.toFixed(1)}" r="3.5" fill="var(--color-accent)"></circle>
   </svg>`;
+}
+
+// Mapa do Brasil por UF — geometria real buscada 1x da API pública do
+// IBGE (não é imagem estática) e reaproveitada nos refreshes seguintes.
+// Se a busca falhar (rede, CORS, IBGE fora do ar), a seção simplesmente
+// continua mostrando as barras por estado — nunca fica em branco.
+const UF_PARA_CODIGO_IBGE = { RO:11, AC:12, AM:13, RR:14, PA:15, AP:16, TO:17, MA:21, PI:22, CE:23, RN:24, PB:25, PE:26, AL:27, SE:28, BA:29, MG:31, ES:32, RJ:33, SP:35, PR:41, SC:42, RS:43, MS:50, MT:51, GO:52, DF:53 };
+const CODIGO_IBGE_PARA_UF = Object.fromEntries(Object.entries(UF_PARA_CODIGO_IBGE).map(([uf, cod]) => [cod, uf]));
+let MAPA_GEOMETRIA_CACHE = null; // guarda os paths já buscados, entre refreshes
+
+function lerpCorMapa(t){
+  const base = [63, 66, 77], alvo = [145, 132, 217];
+  const r = Math.round(base[0] + (alvo[0]-base[0])*t);
+  const g = Math.round(base[1] + (alvo[1]-base[1])*t);
+  const b = Math.round(base[2] + (alvo[2]-base[2])*t);
+  const hex = n => n.toString(16).padStart(2,'0');
+  return '#' + hex(r) + hex(g) + hex(b);
+}
+
+async function buscarGeometriaMapa(){
+  if(MAPA_GEOMETRIA_CACHE) return MAPA_GEOMETRIA_CACHE;
+  const resp = await fetch('https://servicodados.ibge.gov.br/api/v2/malhas/BR?resolucao=2&formato=application/vnd.geo+json');
+  const geo = await resp.json();
+  const projection = d3.geoMercator().fitSize([680, 560], geo);
+  const pathGen = d3.geoPath().projection(projection);
+  MAPA_GEOMETRIA_CACHE = geo.features.map(f => {
+    const [x, y] = projection(f.properties.centroide);
+    return { codigo: Number(f.properties.codarea), d: pathGen(f), x, y };
+  });
+  return MAPA_GEOMETRIA_CACHE;
+}
+
+async function tentarRenderizarMapa(grupoRegioes){
+  const alvo = document.getElementById('mapa-regioes-alvo');
+  if(!alvo) return; // a página já pode ter sido re-renderizada antes da busca terminar
+  try {
+    const geometria = await buscarGeometriaMapa();
+    const valores = {};
+    Object.entries(grupoRegioes || {}).forEach(([uf, valor]) => { valores[uf] = valor; });
+    const total = Object.values(valores).reduce((s,v)=>s+v, 0);
+    const maior = Math.max(1, ...Object.values(valores));
+
+    const paths = geometria.map(f => {
+      const uf = CODIGO_IBGE_PARA_UF[f.codigo] || '';
+      const valor = valores[uf] || 0;
+      const t = Math.sqrt(valor / maior);
+      const pct = total > 0 ? (valor/total*100) : 0;
+      return `<path d="${f.d}" fill="${lerpCorMapa(t)}" stroke="var(--color-bg)" stroke-width="1" style="cursor:pointer;"><title>${escapeHtml(uf || '—')} — ${brl(valor)} (${pct.toFixed(1).replace('.',',')}% do total)</title></path>`;
+    }).join('');
+
+    const alvoAtual = document.getElementById('mapa-regioes-alvo');
+    if(!alvoAtual) return;
+    alvoAtual.innerHTML = `
+      <div style="width:100%;max-width:520px;margin:0 auto;">
+        <svg width="100%" height="420" viewBox="0 0 680 560" style="display:block;">${paths}</svg>
+      </div>
+      <div style="display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-4);font-size:12px;color:var(--color-neutral-400);">
+        <span>Menor volume</span>
+        <div class="map-legend-track"></div>
+        <span>Maior volume</span>
+      </div>`;
+  } catch(err){
+    // silencioso de propósito — as barras (já renderizadas) continuam
+    // servindo como visualização, só não vira mapa dessa vez.
+    console.warn('Não foi possível carregar o mapa do Brasil, mantendo as barras por estado:', err.message);
+  }
 }
 
 function kpiCard(label, value, tagText, tagClass, statusDot){
@@ -508,11 +582,16 @@ function render(){
         <h2>Faturamento por estado</h2>
         <p class="section-sub">Soma do faturamento real do mês por UF do cliente</p>
       </div>
-      <div class="card elev-sm">
+      <div class="card elev-sm" id="mapa-regioes-alvo">
         ${regioesBars(dados.grupo_regioes)}
       </div>
     </section>
   `;
+
+  // tenta trocar as barras pelo mapa do Brasil de verdade — se falhar
+  // (rede, IBGE fora do ar), as barras que já foram renderizadas acima
+  // continuam do jeito que estão, sem tela em branco.
+  tentarRenderizarMapa(dados.grupo_regioes);
 }
 
 // inicialização: usa senha salva na sessão, se tiver; senão mostra login
