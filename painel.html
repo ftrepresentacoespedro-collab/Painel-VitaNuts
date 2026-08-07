@@ -327,8 +327,19 @@ function rankingTable(lista){
 }
 
 // Faturamento por UF — barras horizontais, ordenadas do maior pro menor.
-function regioesBars(grupoRegioes){
-  const entradas = Object.entries(grupoRegioes || {}).filter(([,v]) => v > 0).sort((a,b) => b[1]-a[1]);
+// valorPorCanal: dado um registro de UF ({valor, B2C, B2B, "Não classificado"})
+// e um filtro ('todos'|'B2C'|'B2B'), devolve o número certo.
+function valorRegiaoPorCanal(registro, canal){
+  if(!registro) return 0;
+  if(canal === 'todos') return registro.valor || 0;
+  return registro[canal] || 0;
+}
+
+function regioesBars(grupoRegioes, canal){
+  const entradas = Object.entries(grupoRegioes || {})
+    .map(([uf, reg]) => [uf, valorRegiaoPorCanal(reg, canal)])
+    .filter(([,v]) => v > 0)
+    .sort((a,b) => b[1]-a[1]);
   if(entradas.length === 0) return '<p class="text-muted" style="font-size:13px;">Sem dados de região neste período ainda.</p>';
   const total = entradas.reduce((s,[,v])=>s+v, 0);
   const maior = entradas[0][1];
@@ -372,11 +383,13 @@ function tendenciaSvg(serie, metaMes){
 
 // Mapa do Brasil por UF — geometria real buscada 1x da API pública do
 // IBGE (não é imagem estática) e reaproveitada nos refreshes seguintes.
-// Se a busca falhar (rede, CORS, IBGE fora do ar), a seção simplesmente
-// continua mostrando as barras por estado — nunca fica em branco.
+// Se a busca falhar (rede, CORS, IBGE fora do ar), a área do mapa mostra
+// um aviso — mas a lista de barras (sempre renderizada, logo abaixo)
+// nunca depende disso, então a seção nunca fica sem informação nenhuma.
 const UF_PARA_CODIGO_IBGE = { RO:11, AC:12, AM:13, RR:14, PA:15, AP:16, TO:17, MA:21, PI:22, CE:23, RN:24, PB:25, PE:26, AL:27, SE:28, BA:29, MG:31, ES:32, RJ:33, SP:35, PR:41, SC:42, RS:43, MS:50, MT:51, GO:52, DF:53 };
 const CODIGO_IBGE_PARA_UF = Object.fromEntries(Object.entries(UF_PARA_CODIGO_IBGE).map(([uf, cod]) => [cod, uf]));
 let MAPA_GEOMETRIA_CACHE = null; // guarda os paths já buscados, entre refreshes
+let MAPA_CANAL_ATUAL = 'todos'; // estado do filtro de canal do mapa
 
 function lerpCorMapa(t){
   const base = [63, 66, 77], alvo = [145, 132, 217];
@@ -400,39 +413,81 @@ async function buscarGeometriaMapa(){
   return MAPA_GEOMETRIA_CACHE;
 }
 
+// Tooltip flutuante customizado (em vez do title nativo do navegador,
+// que é feio e não combina com o resto do painel). Um único elemento
+// reaproveitado, reposicionado conforme o mouse se move sobre o SVG.
+function garantirTooltipMapa(){
+  let tt = document.getElementById('mapa-tooltip');
+  if(!tt){
+    tt = document.createElement('div');
+    tt.id = 'mapa-tooltip';
+    tt.style.cssText = 'position:fixed;pointer-events:none;z-index:1000;background:var(--color-neutral-100);color:var(--color-neutral-900);font-size:12.5px;font-weight:500;padding:6px 10px;border-radius:var(--radius-sm);box-shadow:var(--shadow-md);display:none;white-space:nowrap;';
+    document.body.appendChild(tt);
+  }
+  return tt;
+}
+
+function renderizarMapaComFiltro(alvoSvg, geometria, grupoRegioes, canal){
+  const valores = {};
+  Object.entries(grupoRegioes || {}).forEach(([uf, reg]) => { valores[uf] = valorRegiaoPorCanal(reg, canal); });
+  const total = Object.values(valores).reduce((s,v)=>s+v, 0);
+  const maior = Math.max(1, ...Object.values(valores));
+  const tooltip = garantirTooltipMapa();
+
+  alvoSvg.innerHTML = geometria.map(f => {
+    const uf = CODIGO_IBGE_PARA_UF[f.codigo] || '';
+    const valor = valores[uf] || 0;
+    const t = Math.sqrt(valor / maior);
+    const pct = total > 0 ? (valor/total*100) : 0;
+    const nomeUf = escapeHtml(uf || '—');
+    const texto = `${nomeUf} — ${brl(valor)} (${pct.toFixed(1).replace('.',',')}% do total)`;
+    return `<path d="${f.d}" fill="${lerpCorMapa(t)}" stroke="var(--color-bg)" stroke-width="1" style="cursor:pointer;" data-tooltip="${texto.replace(/"/g,'&quot;')}"></path>`;
+  }).join('');
+
+  alvoSvg.querySelectorAll('path').forEach(path => {
+    path.addEventListener('mouseenter', () => {
+      tooltip.textContent = path.getAttribute('data-tooltip');
+      tooltip.style.display = 'block';
+      path.setAttribute('stroke', 'var(--color-accent)');
+      path.setAttribute('stroke-width', '2');
+    });
+    path.addEventListener('mousemove', (e) => {
+      tooltip.style.left = (e.clientX + 14) + 'px';
+      tooltip.style.top = (e.clientY + 14) + 'px';
+    });
+    path.addEventListener('mouseleave', () => {
+      tooltip.style.display = 'none';
+      path.setAttribute('stroke', 'var(--color-bg)');
+      path.setAttribute('stroke-width', '1');
+    });
+  });
+}
+
 async function tentarRenderizarMapa(grupoRegioes){
-  const alvo = document.getElementById('mapa-regioes-alvo');
+  const alvo = document.getElementById('mapa-svg-alvo');
   if(!alvo) return; // a página já pode ter sido re-renderizada antes da busca terminar
   try {
     const geometria = await buscarGeometriaMapa();
-    const valores = {};
-    Object.entries(grupoRegioes || {}).forEach(([uf, valor]) => { valores[uf] = valor; });
-    const total = Object.values(valores).reduce((s,v)=>s+v, 0);
-    const maior = Math.max(1, ...Object.values(valores));
-
-    const paths = geometria.map(f => {
-      const uf = CODIGO_IBGE_PARA_UF[f.codigo] || '';
-      const valor = valores[uf] || 0;
-      const t = Math.sqrt(valor / maior);
-      const pct = total > 0 ? (valor/total*100) : 0;
-      return `<path d="${f.d}" fill="${lerpCorMapa(t)}" stroke="var(--color-bg)" stroke-width="1" style="cursor:pointer;"><title>${escapeHtml(uf || '—')} — ${brl(valor)} (${pct.toFixed(1).replace('.',',')}% do total)</title></path>`;
-    }).join('');
-
-    const alvoAtual = document.getElementById('mapa-regioes-alvo');
+    const alvoAtual = document.getElementById('mapa-svg-alvo');
     if(!alvoAtual) return;
-    alvoAtual.innerHTML = `
-      <div style="width:100%;max-width:520px;margin:0 auto;">
-        <svg width="100%" height="420" viewBox="0 0 680 560" style="display:block;">${paths}</svg>
-      </div>
-      <div style="display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-4);font-size:12px;color:var(--color-neutral-400);">
-        <span>Menor volume</span>
-        <div class="map-legend-track"></div>
-        <span>Maior volume</span>
-      </div>`;
+    renderizarMapaComFiltro(alvoAtual, geometria, grupoRegioes, MAPA_CANAL_ATUAL);
+
+    // liga o filtro de canal, se ainda não estiver ligado
+    const select = document.getElementById('mapa-filtro-canal');
+    if(select && !select.dataset.ligado){
+      select.dataset.ligado = '1';
+      select.addEventListener('change', () => {
+        MAPA_CANAL_ATUAL = select.value;
+        const svgAtual = document.getElementById('mapa-svg-alvo');
+        if(svgAtual) renderizarMapaComFiltro(svgAtual, geometria, grupoRegioes, MAPA_CANAL_ATUAL);
+        const rotulo = document.getElementById('mapa-status-label');
+        if(rotulo) rotulo.textContent = 'Coloração por faturamento — ' + (MAPA_CANAL_ATUAL === 'todos' ? 'Todos os canais' : MAPA_CANAL_ATUAL);
+      });
+    }
   } catch(err){
-    // silencioso de propósito — as barras (já renderizadas) continuam
-    // servindo como visualização, só não vira mapa dessa vez.
-    console.warn('Não foi possível carregar o mapa do Brasil, mantendo as barras por estado:', err.message);
+    const alvoAtual = document.getElementById('mapa-svg-alvo');
+    if(alvoAtual) alvoAtual.closest('.mapa-wrap').innerHTML = '<p class="text-muted" style="font-size:13px;">Não foi possível carregar o mapa agora — veja a lista por estado abaixo.</p>';
+    console.warn('Não foi possível carregar o mapa do Brasil:', err.message);
   }
 }
 
@@ -580,17 +635,44 @@ function render(){
       <div class="section-head">
         <div class="card-kicker" style="opacity:0.7;">Regiões</div>
         <h2>Faturamento por estado</h2>
-        <p class="section-sub">Soma do faturamento real do mês por UF do cliente</p>
+        <p class="section-sub">Passe o mouse sobre um estado pra ver o valor e a participação (%) no total do canal selecionado</p>
       </div>
-      <div class="card elev-sm" id="mapa-regioes-alvo">
-        ${regioesBars(dados.grupo_regioes)}
+
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:var(--space-4);margin-bottom:var(--space-3);flex-wrap:wrap;">
+        <div class="field" style="margin:0;max-width:200px;">
+          <label for="mapa-filtro-canal">Canal</label>
+          <select class="input" id="mapa-filtro-canal">
+            <option value="todos">Todos</option>
+            <option value="B2C">B2C</option>
+            <option value="B2B">B2B</option>
+          </select>
+        </div>
+        <span class="tag tag-outline" id="mapa-status-label">Coloração por faturamento — Todos os canais</span>
+      </div>
+
+      <div class="card elev-sm mapa-wrap" style="padding: var(--space-6); margin-bottom: var(--space-4);">
+        <div style="width:100%;max-width:520px;margin:0 auto;">
+          <svg id="mapa-svg-alvo" width="100%" height="420" viewBox="0 0 680 560" style="display:block;">
+            <text x="340" y="280" text-anchor="middle" font-size="13" fill="var(--color-neutral-500)">Carregando mapa…</text>
+          </svg>
+        </div>
+        <div style="display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-4);font-size:12px;color:var(--color-neutral-400);">
+          <span>Menor volume</span>
+          <div class="map-legend-track"></div>
+          <span>Maior volume</span>
+        </div>
+      </div>
+
+      <div class="card-kicker" style="margin-bottom:var(--space-2);">Lista por estado</div>
+      <div class="card elev-sm">
+        ${regioesBars(dados.grupo_regioes, 'todos')}
       </div>
     </section>
   `;
 
-  // tenta trocar as barras pelo mapa do Brasil de verdade — se falhar
-  // (rede, IBGE fora do ar), as barras que já foram renderizadas acima
-  // continuam do jeito que estão, sem tela em branco.
+  // tenta desenhar o mapa do Brasil de verdade por cima do placeholder —
+  // se falhar (rede, IBGE fora do ar), mostra um aviso só na área do
+  // mapa; a lista logo abaixo nunca depende disso.
   tentarRenderizarMapa(dados.grupo_regioes);
 }
 
